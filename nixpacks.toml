@@ -1,9 +1,11 @@
 # Nixpacks build config for Railway (single-service deploy: API + built client).
+# --include=dev forces devDependencies (typescript, vite) to install even when
+# Railway sets NODE_ENV=production — they are needed to build the client.
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]

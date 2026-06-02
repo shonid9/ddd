@@ -9,8 +9,9 @@ interface Props {
 }
 
 const STATUS_TEXT: Record<Status, string> = {
-  idle: 'הקש על הכפתור ודבר איתי',
-  listening: 'מקשיב…',
+  idle: 'הקש כדי להתחיל שיחה — ואז פשוט דבר',
+  loading: 'מאתחל מנוע קול…',
+  listening: 'מקשיב… דבר חופשי',
   thinking: 'חושב…',
   speaking: 'מדבר…',
   error: 'משהו השתבש',

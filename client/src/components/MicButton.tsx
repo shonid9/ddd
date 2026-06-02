@@ -7,10 +7,10 @@ interface Props {
   getLevel: () => number;
 }
 
-/** The primary control: a glassy mic button whose halo reacts to the voice. */
+/** The primary control: a glassy button that starts/stops the hands-free session. */
 export default function MicButton({ status, onClick, getLevel }: Props) {
   const haloRef = useRef<HTMLSpanElement>(null);
-  const active = status === 'listening' || status === 'speaking';
+  const active = status === 'listening' || status === 'speaking' || status === 'thinking';
 
   useEffect(() => {
     if (!active) {
@@ -32,29 +32,33 @@ export default function MicButton({ status, onClick, getLevel }: Props) {
 
   const label =
     status === 'listening'
-      ? 'סיים והקשב לתשובה'
+      ? 'מקשיב — הקש לעצירה'
       : status === 'speaking'
-        ? 'עצור'
+        ? 'מדבר — הקש לעצירה'
         : status === 'thinking'
-          ? 'חושב'
-          : 'התחל לדבר';
+          ? 'חושב — הקש לעצירה'
+          : status === 'loading'
+            ? 'מאתחל…'
+            : 'הקש כדי להתחיל שיחה';
 
   return (
     <button
       className={`mic-btn mic-${status}`}
       onClick={onClick}
-      disabled={status === 'thinking'}
+      disabled={status === 'loading'}
       aria-label={label}
       title={label}
     >
       <span ref={haloRef} className="mic-halo" aria-hidden="true" />
       <span className="mic-icon" aria-hidden="true">
         {status === 'listening' ? (
-          <StopIcon />
-        ) : status === 'thinking' ? (
+          <MicIcon />
+        ) : status === 'thinking' || status === 'loading' ? (
           <Dots />
         ) : status === 'speaking' ? (
           <Wave />
+        ) : status === 'idle' || status === 'error' ? (
+          <MicIcon />
         ) : (
           <MicIcon />
         )}
@@ -69,14 +73,6 @@ function MicIcon() {
       <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" stroke="none" />
       <path d="M5 11a7 7 0 0 0 14 0" strokeLinecap="round" />
       <line x1="12" y1="18" x2="12" y2="21" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-      <rect x="6" y="6" width="12" height="12" rx="2.5" />
     </svg>
   );
 }

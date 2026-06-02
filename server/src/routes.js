@@ -70,14 +70,34 @@ router.post(
       return res.status(400).json({ error: 'empty_messages', message: 'No messages provided.' });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: config.models.chat,
-      temperature: 0.7,
-      max_tokens: 500,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...sanitized],
-    });
+    let reply = '';
 
-    const reply = completion.choices[0]?.message?.content?.trim() || '';
+    // Primary path: Responses API with the live web_search tool, so the
+    // assistant can answer questions about current events, weather, prices,
+    // etc. Falls back to a plain chat completion if web search is unavailable.
+    try {
+      const response = await openai.responses.create({
+        model: config.models.chat,
+        instructions: SYSTEM_PROMPT,
+        input: sanitized,
+        tools: [{ type: 'web_search_preview' }],
+        max_output_tokens: 800,
+      });
+      reply = (response.output_text || '').trim();
+    } catch (err) {
+      console.warn('[chat] web search path failed, falling back:', err?.message || err);
+    }
+
+    if (!reply) {
+      const completion = await openai.chat.completions.create({
+        model: config.models.chat,
+        temperature: 0.6,
+        max_tokens: 800,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...sanitized],
+      });
+      reply = completion.choices[0]?.message?.content?.trim() || '';
+    }
+
     res.json({ reply });
   }),
 );

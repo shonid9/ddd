@@ -95,9 +95,9 @@ export function useConversation() {
         // Tuned for natural conversational turn-taking.
         positiveSpeechThreshold: 0.55,
         negativeSpeechThreshold: 0.4,
-        redemptionFrames: 12, // ~0.4s of silence ends the turn
-        minSpeechFrames: 4,
-        preSpeechPadFrames: 8,
+        redemptionMs: 480, // silence before a turn is considered finished
+        minSpeechMs: 200, // ignore very short noise blips
+        preSpeechPadMs: 240,
         // Create our own stream so the avatar can visualise the live mic.
         getStream: async () => {
           const stream = await navigator.mediaDevices.getUserMedia({
