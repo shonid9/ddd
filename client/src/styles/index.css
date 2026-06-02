@@ -1,0 +1,360 @@
+:root {
+  --bg: #000;
+  --fg: #eaf2ff;
+  --muted: #8aa0c0;
+  --accent: #4aa8ff;
+  --accent-2: #7cf0ff;
+  --danger: #ff6b6b;
+  --glass: rgba(18, 26, 40, 0.45);
+  --glass-brd: rgba(140, 200, 255, 0.18);
+  font-family: 'Heebo', 'Assistant', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Fill the dynamic viewport (handles mobile browser chrome). */
+.app {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.avatar-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.avatar-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(14px, env(safe-area-inset-top)) 20px 0;
+}
+
+.brand {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--fg);
+  text-shadow: 0 0 18px rgba(74, 168, 255, 0.55);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reset-btn {
+  background: var(--glass);
+  border: 1px solid var(--glass-brd);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: color 0.2s, border-color 0.2s;
+}
+.reset-btn:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--glass-brd);
+  color: var(--muted);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.icon-btn:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.icon-btn.is-on {
+  color: var(--accent-2);
+  border-color: rgba(124, 240, 255, 0.35);
+}
+
+/* ---------------------------------------------------------------- overlay */
+/* The captions live in a tidy card docked to the bottom (phones) so they sit
+   clear of the eye, and to the side (wide screens). */
+.overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 14px;
+  pointer-events: none;
+}
+
+.caption-panel {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 116px; /* clear the mic button */
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(8, 12, 20, 0.55), rgba(8, 12, 20, 0.78));
+  border: 1px solid var(--glass-brd);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: rise 0.35s ease both;
+}
+
+.bubble {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 16px;
+  line-height: 1.55;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(140, 200, 255, 0.12);
+  text-align: start;
+}
+.bubble-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+.bubble-user {
+  color: #dbe6f7;
+}
+.bubble-user .bubble-label {
+  color: var(--accent);
+}
+.bubble-oracle {
+  color: #f0f6ff;
+  border-color: rgba(124, 240, 255, 0.28);
+}
+.bubble-oracle .bubble-label {
+  color: var(--accent-2);
+}
+
+.status {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--muted);
+  min-height: 22px;
+  letter-spacing: 0.5px;
+}
+.status-listening {
+  color: var(--accent);
+}
+.status-speaking {
+  color: var(--accent-2);
+}
+.status-error {
+  color: var(--danger);
+}
+.status-thinking::after {
+  content: '';
+  animation: ellipsis 1.2s steps(4, end) infinite;
+}
+
+/* ---------------------------------------------------------------- controls */
+.controls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 max(26px, env(safe-area-inset-bottom));
+}
+
+.mic-btn {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-brd);
+  background: radial-gradient(circle at 30% 25%, rgba(74, 168, 255, 0.35), rgba(10, 16, 28, 0.85));
+  color: var(--fg);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 rgba(74, 168, 255, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.mic-btn:active {
+  transform: scale(0.94);
+}
+.mic-btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.mic-halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.1s linear;
+}
+
+.mic-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+}
+
+.mic-listening {
+  background: radial-gradient(circle at 30% 25%, rgba(74, 168, 255, 0.6), rgba(10, 16, 28, 0.9));
+  box-shadow: 0 0 36px rgba(74, 168, 255, 0.55);
+}
+.mic-listening .mic-halo {
+  border-color: var(--accent);
+}
+.mic-speaking {
+  background: radial-gradient(circle at 30% 25%, rgba(124, 240, 255, 0.55), rgba(10, 16, 28, 0.9));
+  box-shadow: 0 0 36px rgba(124, 240, 255, 0.5);
+}
+.mic-speaking .mic-halo {
+  border-color: var(--accent-2);
+}
+.mic-error {
+  border-color: var(--danger);
+}
+
+/* icon animations */
+.dot {
+  animation: blink 1.2s infinite both;
+}
+.dot.d2 {
+  animation-delay: 0.2s;
+}
+.dot.d3 {
+  animation-delay: 0.4s;
+}
+.bar {
+  transform-origin: center;
+  animation: eq 0.9s ease-in-out infinite;
+}
+.bar.b2 {
+  animation-delay: 0.15s;
+}
+.bar.b3 {
+  animation-delay: 0.3s;
+}
+.bar.b4 {
+  animation-delay: 0.45s;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1.15);
+  }
+}
+@keyframes ellipsis {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '·';
+  }
+  50% {
+    content: '··';
+  }
+  75% {
+    content: '···';
+  }
+}
+
+@media (min-width: 768px) {
+  .brand {
+    font-size: 26px;
+  }
+  .bubble {
+    font-size: 17px;
+  }
+  .mic-btn {
+    width: 92px;
+    height: 92px;
+  }
+}
+
+/* Wide / landscape screens: dock the captions to the side (RTL start = right)
+   in the empty space beside the centred eye, instead of along the bottom. */
+@media (min-aspect-ratio: 5/4) and (min-width: 900px) {
+  .overlay {
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 32px;
+  }
+  .caption-panel {
+    max-width: 360px;
+    margin-bottom: 0;
+  }
+}

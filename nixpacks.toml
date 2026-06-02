@@ -1,0 +1,12 @@
+# Nixpacks build config for Railway (single-service deploy: API + built client).
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
