@@ -2,10 +2,29 @@ import { useState } from 'react';
 import EyeAvatar from './avatar/EyeAvatar';
 import MicButton from './components/MicButton';
 import StatusOverlay from './components/StatusOverlay';
+import Toolbar from './components/Toolbar';
+import HudLayer from './components/HudLayer';
 import { useConversation } from './hooks/useConversation';
 
 export default function App() {
-  const { status, lastUser, lastReply, error, toggle, reset, getLevel } = useConversation();
+  const {
+    status,
+    live,
+    wakeEnabled,
+    wakeSupported,
+    lastUser,
+    lastReply,
+    error,
+    cards,
+    toggle,
+    toggleLive,
+    setWakeEnabled,
+    dismissCard,
+    describeImage,
+    summarizeUrl,
+    reset,
+    getLevel,
+  } = useConversation();
   const [showCaptions, setShowCaptions] = useState(true);
 
   return (
@@ -24,19 +43,17 @@ export default function App() {
           >
             {showCaptions ? <EyeOpenIcon /> : <EyeOffIcon />}
           </button>
-          <button
-            className="reset-btn"
-            onClick={reset}
-            aria-label="התחל שיחה מחדש"
-            title="התחל מחדש"
-          >
+          <button className="reset-btn" onClick={reset} aria-label="התחל שיחה מחדש" title="התחל מחדש">
             איפוס
           </button>
         </div>
       </header>
 
+      <HudLayer cards={cards} onClose={dismissCard} />
+
       <StatusOverlay
         status={status}
+        live={live}
         lastUser={lastUser}
         lastReply={lastReply}
         error={error}
@@ -44,7 +61,16 @@ export default function App() {
       />
 
       <footer className="controls">
-        <MicButton status={status} onClick={toggle} getLevel={getLevel} />
+        <Toolbar
+          live={live}
+          onToggleLive={toggleLive}
+          wakeEnabled={wakeEnabled}
+          wakeSupported={wakeSupported}
+          onToggleWake={() => setWakeEnabled((v) => !v)}
+          onImage={(file) => void describeImage(file)}
+          onLink={(url) => void summarizeUrl(url)}
+        />
+        <MicButton status={status} live={live} onClick={toggle} getLevel={getLevel} />
       </footer>
     </main>
   );

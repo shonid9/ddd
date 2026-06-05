@@ -18,6 +18,8 @@ export class AudioEngine {
 
   private micSource: MediaStreamAudioSourceNode | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private remoteAudio: HTMLAudioElement | null = null;
+  private remoteSource: MediaStreamAudioSourceNode | null = null;
 
   /** Lazily create/resume the context — must run inside a user gesture on iOS. */
   async ensure(): Promise<AudioContext> {
@@ -58,6 +60,37 @@ export class AudioEngine {
   unvisualizeStream(): void {
     this.micSource?.disconnect();
     this.micSource = null;
+  }
+
+  /**
+   * Play a live remote stream (Realtime mode) through the speakers via an
+   * <audio> element, and tap it into the analyser so the eye reacts to it.
+   */
+  async attachRemoteStream(stream: MediaStream): Promise<void> {
+    await this.ensure();
+    this.detachRemoteStream();
+    const el = new Audio();
+    el.srcObject = stream;
+    el.autoplay = true;
+    void el.play().catch(() => {
+      /* will start on next user gesture */
+    });
+    this.remoteAudio = el;
+    try {
+      this.remoteSource = this.ctx!.createMediaStreamSource(stream);
+      this.remoteSource.connect(this.analyser!); // visualise only
+    } catch {
+      /* some browsers can't tap a remote stream — audio still plays */
+    }
+  }
+
+  detachRemoteStream(): void {
+    this.remoteSource?.disconnect();
+    this.remoteSource = null;
+    if (this.remoteAudio) {
+      this.remoteAudio.srcObject = null;
+      this.remoteAudio = null;
+    }
   }
 
   // ----------------------------------------------------------- playback

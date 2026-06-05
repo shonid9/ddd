@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicVAD } from '@ricky0123/vad-web';
 import { AudioEngine, float32ToWav } from '../lib/audio';
-import { chat, transcribe, tts, type ChatMessage } from '../lib/api';
+import { chat, transcribe, tts, vision, summarize } from '../lib/api';
+import { memory } from '../lib/memory';
+import { WakeWord, wakeWordSupported } from '../lib/wakeword';
+import { RealtimeSession } from '../lib/realtime';
+import type { Card, ChatMessage } from '../types';
 
 export type Status = 'idle' | 'loading' | 'listening' | 'thinking' | 'speaking' | 'error';
 
-// Pin CDN asset paths to the installed package versions (worklet + onnx model
-// + onnxruntime wasm are fetched from jsDelivr at runtime).
 const VAD_BASE = 'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/';
 const ORT_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/';
+const CARD_TTL = 40000; // auto-dismiss cards after 40s
+const uid = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
 
 /**
- * Hands-free voice loop. Once the session starts, the Silero VAD listens
- * continuously: when the user finishes speaking it transcribes → chats →
- * speaks the reply, then automatically resumes listening. No button press per
- * turn. While the avatar is speaking the VAD is paused to avoid it hearing
- * itself.
+ * The conversation brain. Coordinates the classic hands-free voice loop (VAD →
+ * transcribe → chat → speak), the live Realtime mode, vision/summary requests,
+ * the HUD cards, persistent memory and the wake word — exposing a single tidy
+ * API to the UI.
  */
 export function useConversation() {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -26,16 +30,49 @@ export function useConversation() {
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef(false);
   const busyRef = useRef(false);
+  const rtRef = useRef<RealtimeSession | null>(null);
+  const wakeRef = useRef<WakeWord | null>(null);
+  const cardTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const [status, setStatus] = useState<Status>('idle');
   const [active, setActive] = useState(false);
+  const [live, setLive] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(false);
   const [lastUser, setLastUser] = useState('');
   const [lastReply, setLastReply] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
 
-  const messagesRef = useRef<ChatMessage[]>([]);
+  const messagesRef = useRef<ChatMessage[]>(memory.loadHistory());
 
-  // Process one finished utterance, then resume listening.
+  // ---------------------------------------------------------------- cards
+  const dismissCard = useCallback((id: string) => {
+    setCards((cs) => cs.filter((c) => c.id !== id));
+    clearTimeout(cardTimers.current[id]);
+    delete cardTimers.current[id];
+  }, []);
+
+  const addCard = useCallback(
+    (card: Omit<Card, 'id'>) => {
+      const id = uid();
+      setCards((cs) => [...cs, { ...card, id }].slice(-4));
+      cardTimers.current[id] = setTimeout(() => dismissCard(id), CARD_TTL);
+    },
+    [dismissCard],
+  );
+
+  // ---------------------------------------------------------------- speak
+  const speak = useCallback(
+    async (text: string) => {
+      if (!text) return;
+      setStatus('speaking');
+      const bytes = await tts(text);
+      await engine.play(bytes);
+    },
+    [engine],
+  );
+
+  // ---------------------------------------------- classic loop: one utterance
   const handleUtterance = useCallback(
     async (audio: Float32Array) => {
       if (busyRef.current || !sessionRef.current) return;
@@ -59,15 +96,16 @@ export function useConversation() {
         const history = [...messagesRef.current, { role: 'user', content: text } as ChatMessage];
         messagesRef.current = history;
 
-        const reply = (await chat(history)).trim();
+        const result = await chat(history, memory.loadFacts());
+        const reply = result.reply.trim();
         setLastReply(reply);
-        messagesRef.current = [...history, { role: 'assistant', content: reply }];
+        if (result.memory.length) memory.addFacts(result.memory);
+        result.cards.forEach(addCard);
 
-        if (reply) {
-          setStatus('speaking');
-          const audioBytes = await tts(reply);
-          await engine.play(audioBytes);
-        }
+        messagesRef.current = [...history, { role: 'assistant', content: reply }];
+        memory.saveHistory(messagesRef.current);
+
+        if (reply) await speak(reply);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'אירעה שגיאה.');
         setStatus('error');
@@ -79,7 +117,7 @@ export function useConversation() {
         }
       }
     },
-    [engine],
+    [addCard, speak],
   );
 
   const startSession = useCallback(async () => {
@@ -87,26 +125,18 @@ export function useConversation() {
     setStatus('loading');
     try {
       await engine.ensure();
-
       const vad = await MicVAD.new({
         model: 'v5',
         baseAssetPath: VAD_BASE,
         onnxWASMBasePath: ORT_BASE,
-        // Tuned for natural conversational turn-taking.
         positiveSpeechThreshold: 0.55,
         negativeSpeechThreshold: 0.4,
-        redemptionMs: 480, // silence before a turn is considered finished
-        minSpeechMs: 200, // ignore very short noise blips
+        redemptionMs: 480,
+        minSpeechMs: 200,
         preSpeechPadMs: 240,
-        // Create our own stream so the avatar can visualise the live mic.
         getStream: async () => {
           const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              channelCount: 1,
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
+            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
           streamRef.current = stream;
           engine.visualizeStream(stream);
@@ -119,7 +149,6 @@ export function useConversation() {
           void handleUtterance(audio);
         },
       });
-
       vadRef.current = vad;
       sessionRef.current = true;
       setActive(true);
@@ -151,26 +180,180 @@ export function useConversation() {
     setStatus('idle');
   }, [engine]);
 
+  // ------------------------------------------------------------- live mode
+  const startLive = useCallback(async () => {
+    setError(null);
+    setStatus('loading');
+    try {
+      await engine.ensure();
+      const rt = new RealtimeSession({
+        onRemoteStream: (s) => void engine.attachRemoteStream(s),
+        onMicStream: (s) => engine.visualizeStream(s),
+        onUserText: (t) => t && setLastUser(t),
+        onAssistantText: (t, final) => {
+          setLastReply(t);
+          setStatus(final ? 'listening' : 'speaking');
+        },
+        onCard: addCard,
+        onMemory: (f) => memory.addFacts([f]),
+        onStatus: (s, msg) => {
+          if (s === 'live') {
+            setLive(true);
+            setStatus('listening');
+          } else if (s === 'error') {
+            setError(msg || 'מצב חי נכשל.');
+            setStatus('error');
+          }
+        },
+      });
+      await rt.connect('');
+      rtRef.current = rt;
+      setLive(true);
+    } catch (err) {
+      setLive(false);
+      rtRef.current = null;
+      setError(
+        err instanceof Error && /unavailable|handshake/i.test(err.message)
+          ? 'מצב חי לא זמין בחשבון ה-OpenAI. ממשיך במצב הרגיל.'
+          : 'לא ניתן להפעיל מצב חי.',
+      );
+      setStatus('idle');
+    }
+  }, [engine, addCard]);
+
+  const stopLive = useCallback(() => {
+    rtRef.current?.close();
+    rtRef.current = null;
+    engine.detachRemoteStream();
+    engine.unvisualizeStream();
+    setLive(false);
+    setStatus('idle');
+  }, [engine]);
+
+  const toggleLive = useCallback(() => {
+    if (rtRef.current) stopLive();
+    else void startLive();
+  }, [startLive, stopLive]);
+
   /** Main button: start or stop the hands-free session. */
   const toggle = useCallback(() => {
+    if (live) return; // live mode owns the mic; ignore the classic button
     if (sessionRef.current) stopSession();
     else void startSession();
-  }, [startSession, stopSession]);
+  }, [live, startSession, stopSession]);
 
+  // --------------------------------------------------- vision & summarise
+  const runOneShot = useCallback(
+    async (work: () => Promise<{ reply: string; card: Omit<Card, 'id'> }>) => {
+      setError(null);
+      const wasListening = sessionRef.current;
+      try {
+        if (wasListening) vadRef.current?.pause();
+        await engine.ensure();
+        setStatus('thinking');
+        const { reply, card } = await work();
+        setLastReply(reply);
+        addCard(card);
+        messagesRef.current = [...messagesRef.current, { role: 'assistant', content: reply }];
+        memory.saveHistory(messagesRef.current);
+        if (reply) await speak(reply);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'אירעה שגיאה.');
+        setStatus('error');
+      } finally {
+        if (sessionRef.current) {
+          vadRef.current?.start();
+          setStatus('listening');
+        } else {
+          setStatus('idle');
+        }
+      }
+    },
+    [engine, addCard, speak],
+  );
+
+  const describeImage = useCallback(
+    (image: Blob, prompt?: string) =>
+      runOneShot(async () => {
+        const reply = await vision(image, prompt);
+        return { reply, card: { kind: 'vision', title: 'מה אני רואה', body: reply } as Omit<Card, 'id'> };
+      }),
+    [runOneShot],
+  );
+
+  const summarizeUrl = useCallback(
+    (url: string) =>
+      runOneShot(async () => {
+        const reply = await summarize({ url });
+        return {
+          reply,
+          card: { kind: 'summary', title: 'סיכום', body: reply, source: url } as Omit<Card, 'id'>,
+        };
+      }),
+    [runOneShot],
+  );
+
+  // ----------------------------------------------------------- misc / reset
   const reset = useCallback(() => {
     messagesRef.current = [];
+    memory.clearHistory();
     setLastUser('');
     setLastReply('');
     setError(null);
+    setCards([]);
     engine.stopPlayback();
   }, [engine]);
 
+  const clearMemory = useCallback(() => memory.clearFacts(), []);
   const getLevel = useCallback(() => engine.getLevel(), [engine]);
 
-  // Clean up on unmount.
-  useEffect(() => () => stopSession(), [stopSession]);
+  // ----------------------------------------------------------- wake word
+  useEffect(() => {
+    if (!wakeEnabled || active || live) {
+      wakeRef.current?.stop();
+      wakeRef.current = null;
+      return;
+    }
+    const wake = new WakeWord(() => void startSession());
+    wake.start();
+    wakeRef.current = wake;
+    return () => {
+      wake.stop();
+      wakeRef.current = null;
+    };
+  }, [wakeEnabled, active, live, startSession]);
 
-  return { status, active, lastUser, lastReply, error, toggle, reset, getLevel };
+  // Clean up everything on unmount.
+  useEffect(
+    () => () => {
+      stopSession();
+      stopLive();
+      wakeRef.current?.stop();
+      Object.values(cardTimers.current).forEach(clearTimeout);
+    },
+    [stopSession, stopLive],
+  );
+
+  return {
+    status,
+    active,
+    live,
+    wakeEnabled,
+    wakeSupported: wakeWordSupported(),
+    lastUser,
+    lastReply,
+    error,
+    cards,
+    toggle,
+    toggleLive,
+    setWakeEnabled,
+    dismissCard,
+    describeImage,
+    summarizeUrl,
+    reset,
+    clearMemory,
+    getLevel,
+  };
 }
 
 function micErrorMessage(err: unknown): string {

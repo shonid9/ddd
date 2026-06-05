@@ -3,12 +3,13 @@ import type { Status } from '../hooks/useConversation';
 
 interface Props {
   status: Status;
+  live?: boolean;
   onClick: () => void;
   getLevel: () => number;
 }
 
 /** The primary control: a glassy button that starts/stops the hands-free session. */
-export default function MicButton({ status, onClick, getLevel }: Props) {
+export default function MicButton({ status, live = false, onClick, getLevel }: Props) {
   const haloRef = useRef<HTMLSpanElement>(null);
   const active = status === 'listening' || status === 'speaking' || status === 'thinking';
 
@@ -30,8 +31,9 @@ export default function MicButton({ status, onClick, getLevel }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [active, getLevel]);
 
-  const label =
-    status === 'listening'
+  const label = live
+    ? 'מצב חי פעיל'
+    : status === 'listening'
       ? 'מקשיב — הקש לעצירה'
       : status === 'speaking'
         ? 'מדבר — הקש לעצירה'
@@ -43,9 +45,9 @@ export default function MicButton({ status, onClick, getLevel }: Props) {
 
   return (
     <button
-      className={`mic-btn mic-${status}`}
+      className={`mic-btn mic-${status} ${live ? 'mic-live' : ''}`}
       onClick={onClick}
-      disabled={status === 'loading'}
+      disabled={status === 'loading' || live}
       aria-label={label}
       title={label}
     >

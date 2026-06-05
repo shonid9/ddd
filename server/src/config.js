@@ -31,6 +31,12 @@ export const config = {
       'Speak as a calm, deep male synthetic intelligence. Tone: slightly robotic and otherworldly, like a refined alien AI, yet smooth, clear and realistic — not cartoonish. Steady, controlled pacing, low pitch, minimal emotion, faint metallic resonance. Pronounce Hebrew clearly and naturally.',
     // gpt-4o-transcribe is far more accurate than whisper-1 (esp. for Hebrew).
     transcribe: process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-transcribe',
+    // Multimodal model used to read images / camera frames / screenshots.
+    vision: process.env.OPENAI_VISION_MODEL || 'gpt-4o',
+    // Speech-to-speech model for the optional live "JARVIS" mode (laughs,
+    // breaths, barge-in). Requires Realtime API access on the account.
+    realtime: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
+    realtimeVoice: process.env.OPENAI_REALTIME_VOICE || 'ash',
   },
   corsOrigin: (process.env.CORS_ORIGIN || '')
     .split(',')

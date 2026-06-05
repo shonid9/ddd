@@ -2,6 +2,7 @@ import type { Status } from '../hooks/useConversation';
 
 interface Props {
   status: Status;
+  live: boolean;
   lastUser: string;
   lastReply: string;
   error: string | null;
@@ -21,8 +22,15 @@ const STATUS_TEXT: Record<Status, string> = {
  * Hebrew RTL captions docked to the side (desktop) / bottom (phones) so they
  * never sit over the eye. Can be hidden entirely for a clean view.
  */
-export default function StatusOverlay({ status, lastUser, lastReply, error, visible }: Props) {
+export default function StatusOverlay({ status, live, lastUser, lastReply, error, visible }: Props) {
   if (!visible) return null;
+
+  const statusText =
+    status === 'error' && error
+      ? error
+      : live && (status === 'listening' || status === 'idle')
+        ? 'מצב חי פעיל — דבר חופשי, אפשר גם להפסיק אותי'
+        : STATUS_TEXT[status];
 
   return (
     <section className="overlay" aria-live="polite">
@@ -40,9 +48,7 @@ export default function StatusOverlay({ status, lastUser, lastReply, error, visi
           </p>
         )}
 
-        <p className={`status status-${status}`}>
-          {status === 'error' && error ? error : STATUS_TEXT[status]}
-        </p>
+        <p className={`status status-${status} ${live ? 'status-live' : ''}`}>{statusText}</p>
       </div>
     </section>
   );
