@@ -37,7 +37,8 @@ export function useConversation() {
   const [status, setStatus] = useState<Status>('idle');
   const [active, setActive] = useState(false);
   const [live, setLive] = useState(false);
-  const [wakeEnabled, setWakeEnabled] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(true);
+  const [primed, setPrimed] = useState(false);
   const [lastUser, setLastUser] = useState('');
   const [lastReply, setLastReply] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -307,9 +308,24 @@ export function useConversation() {
   const clearMemory = useCallback(() => memory.clearFacts(), []);
   const getLevel = useCallback(() => engine.getLevel(), [engine]);
 
+  /**
+   * First user gesture: unlock audio (required on iOS) and immediately begin
+   * hands-free listening, so from here on the user just talks — no per-turn
+   * taps, and no reliance on the wake word (which iOS Safari doesn't support).
+   */
+  const prime = useCallback(async () => {
+    setPrimed(true);
+    try {
+      await engine.ensure();
+      await startSession();
+    } catch {
+      /* startSession already surfaces mic errors */
+    }
+  }, [engine, startSession]);
+
   // ----------------------------------------------------------- wake word
   useEffect(() => {
-    if (!wakeEnabled || active || live) {
+    if (!wakeEnabled || !primed || active || live) {
       wakeRef.current?.stop();
       wakeRef.current = null;
       return;
@@ -321,7 +337,7 @@ export function useConversation() {
       wake.stop();
       wakeRef.current = null;
     };
-  }, [wakeEnabled, active, live, startSession]);
+  }, [wakeEnabled, primed, active, live, startSession]);
 
   // Clean up everything on unmount.
   useEffect(
@@ -338,12 +354,14 @@ export function useConversation() {
     status,
     active,
     live,
+    primed,
     wakeEnabled,
     wakeSupported: wakeWordSupported(),
     lastUser,
     lastReply,
     error,
     cards,
+    prime,
     toggle,
     toggleLive,
     setWakeEnabled,

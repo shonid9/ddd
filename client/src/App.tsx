@@ -1,97 +1,74 @@
 import { useState } from 'react';
 import EyeAvatar from './avatar/EyeAvatar';
-import MicButton from './components/MicButton';
+import Menu from './components/Menu';
 import StatusOverlay from './components/StatusOverlay';
-import Toolbar from './components/Toolbar';
 import HudLayer from './components/HudLayer';
 import { useConversation } from './hooks/useConversation';
 
 export default function App() {
-  const {
-    status,
-    live,
-    wakeEnabled,
-    wakeSupported,
-    lastUser,
-    lastReply,
-    error,
-    cards,
-    toggle,
-    toggleLive,
-    setWakeEnabled,
-    dismissCard,
-    describeImage,
-    summarizeUrl,
-    reset,
-    getLevel,
-  } = useConversation();
-  const [showCaptions, setShowCaptions] = useState(true);
+  const c = useConversation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(false);
 
   return (
     <main className="app">
-      <EyeAvatar getLevel={getLevel} />
+      <EyeAvatar getLevel={c.getLevel} />
 
-      <header className="topbar">
-        <h1 className="brand">אורקל</h1>
-        <div className="topbar-actions">
-          <button
-            className={`icon-btn ${showCaptions ? 'is-on' : ''}`}
-            onClick={() => setShowCaptions((v) => !v)}
-            aria-pressed={showCaptions}
-            aria-label={showCaptions ? 'הסתר כתוביות' : 'הצג כתוביות'}
-            title={showCaptions ? 'הסתר כתוביות' : 'הצג כתוביות'}
-          >
-            {showCaptions ? <EyeOpenIcon /> : <EyeOffIcon />}
-          </button>
-          <button className="reset-btn" onClick={reset} aria-label="התחל שיחה מחדש" title="התחל מחדש">
-            איפוס
-          </button>
-        </div>
-      </header>
+      {/* The whole eye is the primary control: tap to start / stop talking. */}
+      <button
+        className={`eye-tap status-${c.status} ${c.live ? 'is-live' : ''}`}
+        onClick={c.toggle}
+        aria-label={c.active || c.live ? 'עצור שיחה' : 'התחל שיחה'}
+      />
 
-      <HudLayer cards={cards} onClose={dismissCard} />
+      <button className="hamburger" onClick={() => setMenuOpen(true)} aria-label="תפריט" title="תפריט">
+        <span />
+        <span />
+        <span />
+      </button>
+
+      <HudLayer cards={c.cards} onClose={c.dismissCard} />
+
+      <Menu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        active={c.active}
+        live={c.live}
+        status={c.status}
+        wakeEnabled={c.wakeEnabled}
+        wakeSupported={c.wakeSupported}
+        showCaptions={showCaptions}
+        onToggleConversation={c.toggle}
+        onToggleLive={c.toggleLive}
+        onToggleWake={() => c.setWakeEnabled((v) => !v)}
+        onToggleCaptions={() => setShowCaptions((v) => !v)}
+        onImage={(file) => void c.describeImage(file)}
+        onClearMemory={c.clearMemory}
+        onReset={c.reset}
+      />
 
       <StatusOverlay
-        status={status}
-        live={live}
-        lastUser={lastUser}
-        lastReply={lastReply}
-        error={error}
+        status={c.status}
+        live={c.live}
+        lastUser={c.lastUser}
+        lastReply={c.lastReply}
+        error={c.error}
         visible={showCaptions}
       />
 
-      <footer className="controls">
-        <Toolbar
-          live={live}
-          onToggleLive={toggleLive}
-          wakeEnabled={wakeEnabled}
-          wakeSupported={wakeSupported}
-          onToggleWake={() => setWakeEnabled((v) => !v)}
-          onImage={(file) => void describeImage(file)}
-          onLink={(url) => void summarizeUrl(url)}
-        />
-        <MicButton status={status} live={live} onClick={toggle} getLevel={getLevel} />
-      </footer>
+      {/* Surface errors even when captions are off, as a brief toast. */}
+      {c.error && !showCaptions && <div className="toast-error">{c.error}</div>}
+
+      {/* First-run gate: one tap unlocks audio (iOS) and arms the wake word. */}
+      {!c.primed && (
+        <div className="wake-gate" onClick={() => void c.prime()}>
+          <div className="wake-gate-inner">
+            <div className="wake-orb" aria-hidden="true" />
+            <p className="wake-title">הקש כדי להעיר את אורקל</p>
+            <p className="wake-sub">ואז פשוט דבר — אני מקשיב. הקש על העין כדי לעצור או להמשיך.</p>
+          </div>
+        </div>
+      )}
     </main>
-  );
-}
-
-function EyeOpenIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function EyeOffIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a13.2 13.2 0 0 1-2.16 2.97" />
-      <path d="M6.06 6.06C3.43 7.74 2 11 2 11s3.5 7 10 7a9.3 9.3 0 0 0 4.94-1.06" />
-      <path d="m9.9 9.9a3 3 0 0 0 4.2 4.2" />
-      <line x1="2" y1="2" x2="22" y2="22" />
-    </svg>
   );
 }

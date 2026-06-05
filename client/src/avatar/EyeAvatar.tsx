@@ -65,16 +65,17 @@ export default function EyeAvatar({ getLevel }: EyeAvatarProps) {
       // touch; on wide screens keep it centred.
       const aspect = w / h;
       const center = uniforms.uCenter.value as THREE.Vector2;
+      // The screen is now just the eye, so centre it and let it fill more space.
       if (aspect < 0.85) {
-        // Phone portrait: keep it centred and compact.
-        center.set(0, 0.04);
-        uniforms.uScale.value = 0.7;
+        // Phone portrait: centred hero.
+        center.set(0, 0.0);
+        uniforms.uScale.value = 0.92;
       } else if (aspect < 1.25) {
-        center.set(0, 0.02);
-        uniforms.uScale.value = 0.82;
-      } else {
         center.set(0, 0.0);
         uniforms.uScale.value = 1.0;
+      } else {
+        center.set(0, 0.0);
+        uniforms.uScale.value = 1.05;
       }
     };
     resize();

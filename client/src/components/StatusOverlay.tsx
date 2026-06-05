@@ -10,46 +10,33 @@ interface Props {
 }
 
 const STATUS_TEXT: Record<Status, string> = {
-  idle: 'הקש כדי להתחיל שיחה — ואז פשוט דבר',
-  loading: 'מאתחל מנוע קול…',
-  listening: 'מקשיב… דבר חופשי',
+  idle: '',
+  loading: 'מאתחל…',
+  listening: 'מקשיב…',
   thinking: 'חושב…',
   speaking: 'מדבר…',
-  error: 'משהו השתבש',
+  error: '',
 };
 
 /**
- * Hebrew RTL captions docked to the side (desktop) / bottom (phones) so they
- * never sit over the eye. Can be hidden entirely for a clean view.
+ * A slim, single caption line docked to the very bottom — shows the assistant's
+ * last reply (or the live status), clipped to two lines, never covering the eye.
+ * Hidden unless the user turns captions on (errors aside).
  */
 export default function StatusOverlay({ status, live, lastUser, lastReply, error, visible }: Props) {
   if (!visible) return null;
 
-  const statusText =
-    status === 'error' && error
-      ? error
-      : live && (status === 'listening' || status === 'idle')
-        ? 'מצב חי פעיל — דבר חופשי, אפשר גם להפסיק אותי'
-        : STATUS_TEXT[status];
+  const hint = live ? 'מצב חי — דבר חופשי' : STATUS_TEXT[status];
+  const text = lastReply || lastUser || hint;
+  if (!text && !error) return null;
 
   return (
-    <section className="overlay" aria-live="polite">
-      <div className="caption-panel">
-        {lastUser && (
-          <p className="bubble bubble-user">
-            <span className="bubble-label">אתה</span>
-            {lastUser}
-          </p>
-        )}
-        {lastReply && status !== 'thinking' && (
-          <p className="bubble bubble-oracle">
-            <span className="bubble-label">אורקל</span>
-            {lastReply}
-          </p>
-        )}
-
-        <p className={`status status-${status} ${live ? 'status-live' : ''}`}>{statusText}</p>
-      </div>
-    </section>
+    <div className="captions-bar" aria-live="polite">
+      {error ? (
+        <p className="captions-text is-error">{error}</p>
+      ) : (
+        <p className={`captions-text ${status === 'speaking' || live ? 'is-speaking' : ''}`}>{text}</p>
+      )}
+    </div>
   );
 }
