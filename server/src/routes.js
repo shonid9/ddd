@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import OpenAI, { toFile } from 'openai';
 import { config } from './config.js';
-import { SYSTEM_PROMPT, VISION_PROMPT, SUMMARY_PROMPT } from './prompt.js';
+import { SYSTEM_PROMPT, REALTIME_INSTRUCTIONS, VISION_PROMPT, SUMMARY_PROMPT } from './prompt.js';
 import { TOOLS, parseResponse } from './tools.js';
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
@@ -220,10 +220,12 @@ router.post(
       headers: {
         Authorization: `Bearer ${config.openaiApiKey}`,
         'Content-Type': 'application/json',
+        'OpenAI-Beta': 'realtime=v1',
       },
       body: JSON.stringify({
         model: config.models.realtime,
         voice: config.models.realtimeVoice,
+        instructions: REALTIME_INSTRUCTIONS,
       }),
     });
 
@@ -233,7 +235,12 @@ router.post(
         .status(r.status)
         .json({ error: 'realtime_unavailable', message: data?.error?.message || 'Realtime API unavailable.' });
     }
-    res.json({ ...data, model: config.models.realtime, instructions: SYSTEM_PROMPT });
+    res.json({
+      ...data,
+      model: config.models.realtime,
+      voice: config.models.realtimeVoice,
+      instructions: REALTIME_INSTRUCTIONS,
+    });
   }),
 );
 

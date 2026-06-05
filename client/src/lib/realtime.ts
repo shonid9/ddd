@@ -99,7 +99,11 @@ export class RealtimeSession {
     const resp = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
       method: 'POST',
       body: offer.sdp,
-      headers: { Authorization: `Bearer ${ephemeral}`, 'Content-Type': 'application/sdp' },
+      headers: {
+        Authorization: `Bearer ${ephemeral}`,
+        'Content-Type': 'application/sdp',
+        'OpenAI-Beta': 'realtime=v1',
+      },
     });
     if (!resp.ok) throw new Error('Realtime handshake failed.');
     const answer = await resp.text();
@@ -112,7 +116,8 @@ export class RealtimeSession {
       session: {
         modalities: ['audio', 'text'],
         instructions,
-        voice: 'ash',
+        // voice is fixed at session creation (server side) — don't re-set it
+        // here, the Realtime API rejects changing the voice mid-session.
         input_audio_transcription: { model: 'whisper-1' },
         turn_detection: { type: 'server_vad', threshold: 0.5, silence_duration_ms: 500 },
         tools: REALTIME_TOOLS,
