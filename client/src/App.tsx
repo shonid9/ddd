@@ -3,31 +3,39 @@ import EyeAvatar from './avatar/EyeAvatar';
 import Menu from './components/Menu';
 import StatusOverlay from './components/StatusOverlay';
 import HudLayer from './components/HudLayer';
+import Loader from './site/Loader';
+import Hero from './site/Hero';
+import Marquee from './site/Marquee';
+import Capabilities from './site/Capabilities';
+import Console from './site/Console';
+import Memory from './site/Memory';
+import Footer from './site/Footer';
 import { useConversation } from './hooks/useConversation';
+import { useSmoothScroll } from './hooks/useSmoothScroll';
+import { useReveals } from './hooks/useReveals';
 
 export default function App() {
   const c = useConversation();
+  const [loaded, setLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCaptions, setShowCaptions] = useState(false);
 
-  return (
-    <main className="app">
-      <EyeAvatar getLevel={c.getLevel} />
+  useSmoothScroll(loaded);
+  useReveals(loaded);
 
-      {/* The whole eye is the primary control: tap to start / stop talking. */}
-      <button
-        className={`eye-tap status-${c.status} ${c.live ? 'is-live' : ''}`}
-        onClick={c.toggle}
-        aria-label={c.active || c.live ? 'עצור שיחה' : 'התחל שיחה'}
-      />
+  return (
+    <div className="app">
+      {/* Persistent living eye behind the whole site. */}
+      <EyeAvatar getLevel={c.getLevel} />
+      <div className="eye-scrim" aria-hidden="true" />
+
+      {!loaded && <Loader onDone={() => setLoaded(true)} />}
 
       <button className="hamburger" onClick={() => setMenuOpen(true)} aria-label="תפריט" title="תפריט">
         <span />
         <span />
         <span />
       </button>
-
-      <HudLayer cards={c.cards} onClose={c.dismissCard} />
 
       <Menu
         open={menuOpen}
@@ -47,6 +55,18 @@ export default function App() {
         onReset={c.reset}
       />
 
+      <HudLayer cards={c.cards} onClose={c.dismissCard} />
+
+      <main className={`site ${loaded ? 'is-ready' : ''}`}>
+        <Hero />
+        <Marquee items={['בינה', 'קול', 'ידע', 'ראייה', 'זיכרון', 'עברית']} />
+        <Capabilities />
+        <Marquee items={['ORACLE', 'REAL-TIME', 'VOICE', 'MEMORY', 'VISION']} reverse />
+        <Console c={c} />
+        <Memory c={c} />
+        <Footer />
+      </main>
+
       <StatusOverlay
         status={c.status}
         live={c.live}
@@ -55,20 +75,7 @@ export default function App() {
         error={c.error}
         visible={showCaptions}
       />
-
-      {/* Surface errors even when captions are off, as a brief toast. */}
       {c.error && !showCaptions && <div className="toast-error">{c.error}</div>}
-
-      {/* First-run gate: one tap unlocks audio (iOS) and arms the wake word. */}
-      {!c.primed && (
-        <div className="wake-gate" onClick={() => void c.prime()}>
-          <div className="wake-gate-inner">
-            <div className="wake-orb" aria-hidden="true" />
-            <p className="wake-title">הקש כדי להעיר את אורקל</p>
-            <p className="wake-sub">ואז פשוט דבר — אני מקשיב. הקש על העין כדי לעצור או להמשיך.</p>
-          </div>
-        </div>
-      )}
-    </main>
+    </div>
   );
 }

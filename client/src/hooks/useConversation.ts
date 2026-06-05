@@ -43,8 +43,15 @@ export function useConversation() {
   const [lastReply, setLastReply] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [facts, setFacts] = useState<string[]>(memory.loadFacts());
 
   const messagesRef = useRef<ChatMessage[]>(memory.loadHistory());
+
+  /** Persist new memory facts and reflect them in state (for the UI section). */
+  const remember = useCallback((list: string[]) => {
+    if (!list.length) return;
+    setFacts(memory.addFacts(list));
+  }, []);
 
   // ---------------------------------------------------------------- cards
   const dismissCard = useCallback((id: string) => {
@@ -100,7 +107,7 @@ export function useConversation() {
         const result = await chat(history, memory.loadFacts());
         const reply = result.reply.trim();
         setLastReply(reply);
-        if (result.memory.length) memory.addFacts(result.memory);
+        if (result.memory.length) remember(result.memory);
         result.cards.forEach(addCard);
 
         messagesRef.current = [...history, { role: 'assistant', content: reply }];
@@ -118,7 +125,7 @@ export function useConversation() {
         }
       }
     },
-    [addCard, speak],
+    [addCard, speak, remember],
   );
 
   const startSession = useCallback(async () => {
@@ -196,7 +203,7 @@ export function useConversation() {
           setStatus(final ? 'listening' : 'speaking');
         },
         onCard: addCard,
-        onMemory: (f) => memory.addFacts([f]),
+        onMemory: (f) => remember([f]),
         onStatus: (s, msg) => {
           if (s === 'live') {
             setLive(true);
@@ -220,7 +227,7 @@ export function useConversation() {
       );
       setStatus('idle');
     }
-  }, [engine, addCard]);
+  }, [engine, addCard, remember]);
 
   const stopLive = useCallback(() => {
     rtRef.current?.close();
@@ -305,7 +312,10 @@ export function useConversation() {
     engine.stopPlayback();
   }, [engine]);
 
-  const clearMemory = useCallback(() => memory.clearFacts(), []);
+  const clearMemory = useCallback(() => {
+    memory.clearFacts();
+    setFacts([]);
+  }, []);
   const getLevel = useCallback(() => engine.getLevel(), [engine]);
 
   /**
@@ -361,6 +371,7 @@ export function useConversation() {
     lastReply,
     error,
     cards,
+    facts,
     prime,
     toggle,
     toggleLive,
@@ -373,6 +384,9 @@ export function useConversation() {
     getLevel,
   };
 }
+
+/** The full conversation API, for components that receive it as a prop. */
+export type Conversation = ReturnType<typeof useConversation>;
 
 function micErrorMessage(err: unknown): string {
   const name = (err as { name?: string })?.name;

@@ -20,28 +20,37 @@ html,
 body,
 #root {
   margin: 0;
-  height: 100%;
+  min-height: 100%;
   width: 100%;
   background: var(--bg);
   color: var(--fg);
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* The app is just a positioning context; everything is layered over the eye. */
+/* The app is a relative container; the eye is a fixed background, the site
+   scrolls over it. */
 .app {
-  position: fixed;
-  inset: 0;
-  height: 100dvh;
-  width: 100vw;
-  user-select: none;
+  position: relative;
+  width: 100%;
 }
 
 /* ---------------------------------------------------------------- the eye */
 .avatar-canvas {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
+}
+/* Gradient scrim so text over the fixed eye stays legible. */
+.eye-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% 0%, transparent 40%, rgba(0, 0, 0, 0.5) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55));
 }
 .avatar-canvas canvas {
   display: block;
@@ -62,10 +71,10 @@ body,
 
 /* ---------------------------------------------------------------- hamburger */
 .hamburger {
-  position: absolute;
+  position: fixed;
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
-  z-index: 6;
+  z-index: 30;
   width: 46px;
   height: 46px;
   border-radius: 50%;
@@ -97,7 +106,7 @@ body,
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 40;
   background: rgba(2, 6, 14, 0.5);
   backdrop-filter: blur(3px);
   opacity: 0;
@@ -114,7 +123,7 @@ body,
   top: 0;
   bottom: 0;
   right: 0;
-  z-index: 21;
+  z-index: 41;
   width: min(360px, 88vw);
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
   background: var(--glass-strong);
@@ -237,11 +246,11 @@ body,
 
 /* ---------------------------------------------------------------- captions */
 .captions-bar {
-  position: absolute;
+  position: fixed;
   left: 50%;
   bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
   transform: translateX(-50%);
-  z-index: 3;
+  z-index: 16;
   width: min(620px, 92vw);
   padding: 10px 16px;
   border-radius: 16px;
@@ -271,11 +280,11 @@ body,
 
 /* ---------------------------------------------------------------- error toast */
 .toast-error {
-  position: absolute;
+  position: fixed;
   left: 50%;
   bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px));
   transform: translateX(-50%);
-  z-index: 7;
+  z-index: 17;
   max-width: 90vw;
   padding: 10px 16px;
   border-radius: 14px;
@@ -329,8 +338,8 @@ body,
 
 /* ---------------------------------------------------------------- HUD cards */
 .hud-layer {
-  position: absolute;
-  z-index: 4;
+  position: fixed;
+  z-index: 18;
   top: max(74px, calc(env(safe-area-inset-top) + 64px));
   left: max(14px, env(safe-area-inset-left));
   display: flex;
